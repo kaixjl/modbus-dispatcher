@@ -1,0 +1,20 @@
+servers:
+  - name: svr1
+    host: localhost
+    port: 5050
+  - name: svr2
+    host: localhost
+    port: 5030
+slots:
+  - key: 1
+    server: svr1
+    address: 1
+    slave: 1
+  - key: 2
+    server: svr1
+    address: 2
+    slave: 1
+  - key: 3
+    server: svr2
+    address: 1
+    slave: 1

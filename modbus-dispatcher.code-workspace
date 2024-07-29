@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../rtsp-dispatcher"
+		},
+		{
+			"path": "../../sources/pymodbus_examples/examples"
+		}
+	],
+	"settings": {}
+}
