@@ -1,20 +1,89 @@
+tailing_byte: 0x20 # 1个字节
 servers:
-  - name: svr1
-    host: localhost
-    port: 5050
-  - name: svr2
-    host: localhost
-    port: 5030
+  - name: led1
+    host: localhost # 192.168.27.123
+    port: 5003
+  - name: led2
+    host: localhost # 192.168.27.124
+    port: 5003
 slots:
-  - key: 1
-    server: svr1
-    address: 1
+  - key: 1 # 今日检车数量
+    server: led1
+    address: 0
+    length: 4 # 3个字的文字 + 1个字的颜色。这里固定最后一个字表示颜色，下同。
     slave: 1
-  - key: 2
-    server: svr1
-    address: 2
+  - key: 2 # 检车状态
+    server: led1
+    address: 4
+    length: 5
     slave: 1
-  - key: 3
-    server: svr2
-    address: 1
+  - key: 3 # 检车提示
+    server: led1
+    address: 9
+    length: 21
+    slave: 1
+  - key: 4 # 反光条（前）
+    server: led2
+    address: 30
+    length: 2
+    slave: 1
+  - key: 5 # 反光条（后）
+    server: led2
+    address: 32
+    length: 2
+    slave: 1
+  - key: 6 # 反光条（左）
+    server: led2
+    address: 34
+    length: 2
+    slave: 1
+  - key: 7 # 反光条（右）
+    server: led2
+    address: 36
+    length: 2
+    slave: 1
+  - key: 8 # 远光灯（左）
+    server: led2
+    address: 38
+    length: 4
+    slave: 1
+  - key: 9 # 远光灯（右）
+    server: led2
+    address: 42
+    length: 4
+    slave: 1
+  - key: 10 # 车速
+    server: led2
+    address: 46
+    length: 4
+    slave: 1
+  - key: 11 # 前转向灯（左）
+    server: led2
+    address: 50
+    length: 4
+    slave: 1
+  - key: 12 # 前转向灯（右）
+    server: led2
+    address: 54
+    length: 4
+    slave: 1
+  - key: 13 # 双闪灯
+    server: led2
+    address: 58
+    length: 4
+    slave: 1
+  - key: 14 # 后转向灯（左）
+    server: led2
+    address: 62
+    length: 4
+    slave: 1
+  - key: 15 # 后转向灯（右）
+    server: led2
+    address: 66
+    length: 4
+    slave: 1
+  - key: 16 # 刹车尾灯
+    server: led2
+    address: 70
+    length: 4
     slave: 1
