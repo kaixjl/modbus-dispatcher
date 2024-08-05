@@ -198,7 +198,7 @@ class ModbusDispatcher(threading.Thread):
         if q is not None:
             self.queue = q # type: mp.Queue[dict[str]]
         else:
-            self.queue = mp.Queue(maxlen=self.capacity) # type: mp.Queue[dict[str]]
+            self.queue = mp.Queue(maxsize=self.capacity) # type: mp.Queue[dict[str]]
 
         if isinstance(proxier, ModbusProxier):
             self.proxier = proxier
