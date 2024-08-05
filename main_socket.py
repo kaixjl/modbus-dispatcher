@@ -15,8 +15,8 @@ class LEDProxier:
             with open(config, "r") as f:
                 config = yaml.safe_load(f)
         self.config = config
-        self.tailing_byte = self.config["tailing_byte"] # type: int
-
+        self.tailing_byte = self.config["tailing_byte"].to_bytes(1, "big") # type: bytes
+        
         self.servers = { it["name"]: LEDProxier.ServerType(it["host"], it["port"])
                          for it in self.config["servers"] }
         self.slots = { it["key"]: LEDProxier.SlotType(it["server"], it["address"], it["slave"], it["length"]) for it in self.config["slots"] }
@@ -29,6 +29,7 @@ class LEDProxier:
             s.connect((server.host, server.port))
             return True
         except socket.error as e:
+            print(f"Received Exception when connecting ({e})", file=sys.stderr)
             return False
 
     def write_str(self, slot, msg, color, encoding="utf-8"):
@@ -37,11 +38,11 @@ class LEDProxier:
             print(f"Slot {slot} not found.", file=sys.stderr)
             return False
         s = self.slots[slot]
-        v = self.registers_from_str(msg, encoding)
+        v = self.registers_from_str(msg, encoding, tailling=self.tailing_byte)
         if len(v) > s.length - 1:
             v = v[:s.length - 1]
         elif len(v) < s.length - 1:
-            v.extend([int.from_bytes(bytes([self.tailing_byte] * 2), byteorder="big")] * (s.length - 1 - len(v)))
+            v.extend([int.from_bytes(self.tailing_byte * 2, byteorder="big")] * (s.length - 1 - len(v)))
         v.append(color)
         return self.write_registers(slot, v)
 
@@ -51,11 +52,11 @@ class LEDProxier:
             print(f"Slot {slot} not found.", file=sys.stderr)
             return False
         s = self.slots[slot]
-        v = self.registers_from_str(msg, encoding)
+        v = self.registers_from_str(msg, encoding, tailling=self.tailing_byte)
         if len(v) > s.length - 1:
             v = v[:s.length - 1]
         elif len(v) < s.length - 1:
-            v.extend([self.tailing_byte] * 2 * (s.length - 1 - len(v)))
+            v.extend([int.from_bytes(self.tailing_byte * 2, byteorder="big")] * (s.length - 1 - len(v)))
         return self.write_registers(slot, v)
 
     def write_color(self, slot, color):
@@ -67,7 +68,7 @@ class LEDProxier:
         """
         - offset: in WORD
         """
-        return self.write_registers(slot, self.registers_from_bytes(msg), offset)
+        return self.write_registers(slot, self.registers_from_bytes(msg, tailling=self.tailing_byte), offset)
 
     def write_registers(self, slot, values, offset=0):
         # type: (str, list[int] | int, int) -> bool
@@ -97,7 +98,7 @@ class LEDProxier:
             rr = s.send(self.header_bin)
             rr = s.send(bytes(self.data))
         except Exception as e:
-            print(f"Received Exception({e})", file=sys.stderr)
+            print(f"Received Exception when writing registers ({e})", file=sys.stderr)
             return False
 
         s.close()
@@ -105,10 +106,12 @@ class LEDProxier:
         return True
     
     @classmethod
-    def registers_from_bytes(cls, msg):
-        # type: (bytes) -> list[int]
+    def registers_from_bytes(cls, msg, tailling=b'\x00'):
+        # type: (bytes, bytes) -> list[int]
         payload = []
         payload_bin = msg
+        if (len(payload_bin) % 2 == 1):
+            payload_bin = payload_bin + tailling[:1]
         for i in range(len(payload_bin)//2):
             payload.append(int.from_bytes(bytes(payload_bin[i*2:i*2+2]), byteorder="big"))
         return payload
@@ -122,9 +125,9 @@ class LEDProxier:
         return bytes(payload)
     
     @classmethod
-    def registers_from_str(cls, msg, encoding="utf-8"):
-        # type: (str, str) -> list[int]
-        return cls.registers_from_bytes(msg.encode(encoding=encoding))
+    def registers_from_str(cls, msg, encoding="utf-8", tailling=b'\x00'):
+        # type: (str, str, bytes) -> list[int]
+        return cls.registers_from_bytes(msg.encode(encoding=encoding), tailling=tailling)
     
     @classmethod
     def registers_to_str(cls, regs, encoding="utf-8"):
@@ -167,7 +170,8 @@ class ModbusDispatcher(threading.Thread):
         try:
             self.queue.put(dict(slot=slot, msg=msg, color=color), block=block, timeout=timeout)
             return True
-        except:
+        except Exception as e:
+            print(f"Received Exception while enqueing ({e})", file=sys.stderr)
             return False
 
     def process_one(self, block=True, timeout=None):
@@ -175,7 +179,8 @@ class ModbusDispatcher(threading.Thread):
         try:
             msg = self.queue.get(block, timeout)
             return self.proxier.write_str(msg["slot"], msg["msg"], msg["color"], encoding="gb2312")
-        except:
+        except Exception as e:
+            print(f"Received Exception while processing ({e})", file=sys.stderr)
             return False
 
     def run(self):
@@ -202,7 +207,7 @@ def assert_data(data, i):
                     01 10 00 00 00 4A 94
                     31 35 20 20 20 20 00 02
                     D5 FD D4 DA BC EC B3 B5 00 02
-                    c6 bb b9 fb c5 c9 20 20 20 20 20 20 20 20 20 20
+                    c7 eb b0 b4 cc e1 ca be b2 d9 d7 f7 20 20 20 20
                     20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
                     20 20 20 20 20 20 20 20 00 01
                     D3 D0 00 02 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02
@@ -215,9 +220,9 @@ def assert_data(data, i):
         bytes.fromhex("""
                     00 01 00 00 00 9B
                     01 10 00 00 00 4A 94
-                    c6 bb b9 fb c5 c9 00 03
+                    36 32 35 20 20 20 00 01
                     D5 FD D4 DA BC EC B3 B5 00 02
-                    c6 bb b9 fb c5 c9 20 20 20 20 20 20 20 20 20 20
+                    c7 eb b0 b4 cc e1 ca be b2 d9 d7 f7 20 20 20 20
                     20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
                     20 20 20 20 20 20 20 20 00 01
                     D3 D0 00 02 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02
@@ -230,9 +235,9 @@ def assert_data(data, i):
         bytes.fromhex("""
                     00 01 00 00 00 9B
                     01 10 00 00 00 4A 94
-                    c6 bb b9 fb c5 c9 00 03
-                    c6 bb b9 fb c5 c9 20 20 00 01
-                    c6 bb b9 fb c5 c9 20 20 20 20 20 20 20 20 20 20
+                    36 32 35 20 20 20 00 01
+                    bc ec b3 b5 d6 d0 20 20 00 01
+                    c7 eb b0 b4 cc e1 ca be b2 d9 d7 f7 20 20 20 20
                     20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
                     20 20 20 20 20 20 20 20 00 01
                     D3 D0 00 02 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02
@@ -245,9 +250,9 @@ def assert_data(data, i):
         bytes.fromhex("""
                     00 01 00 00 00 9B
                     01 10 00 00 00 4A 94
-                    c6 bb b9 fb c5 c9 00 03
-                    c6 bb b9 fb c5 c9 20 20 00 01
-                    c6 bb b9 fb c5 c9 20 20 20 20 20 20 20 20 20 20
+                    36 32 35 20 20 20 00 01
+                    bc ec b3 b5 d6 d0 20 20 00 01
+                    c7 eb b0 b4 cc e1 ca be b2 d9 d7 f7 20 20 20 20
                     20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
                     20 20 20 20 20 20 20 20 00 01
                     41 42 00 01 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02
@@ -260,9 +265,9 @@ def assert_data(data, i):
         bytes.fromhex("""
                     00 01 00 00 00 9B
                     01 10 00 00 00 4A 94
-                    c6 bb b9 fb c5 c9 00 03
-                    c6 bb b9 fb c5 c9 20 20 00 01
-                    c6 bb b9 fb c5 c9 20 20 20 20 20 20 20 20 20 20
+                    36 32 35 20 20 20 00 01
+                    bc ec b3 b5 d6 d0 20 20 00 01
+                    c7 eb b0 b4 cc e1 ca be b2 d9 d7 f7 20 20 20 20
                     20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
                     20 20 20 20 20 20 20 20 00 01
                     41 42 00 01 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02
@@ -311,15 +316,21 @@ def main():
     subproc = mp.Process(target=dispatch_modbus, args=(q,))
     subproc.start()
 
-    q.put(dict(slot=3, msg="苹果派", color=1))
-    q.put(dict(slot=1, msg="苹果派", color=3))
-    q.put(dict(slot=2, msg="苹果派", color=1))
+    q.put(dict(slot=3, msg="请按提示操作", color=1))
+    time.sleep(1)
+    q.put(dict(slot=1, msg="625", color=1))
+    time.sleep(1)
+    q.put(dict(slot=2, msg="检车中", color=1))
+    time.sleep(1)
     q.put(dict(slot=4, msg="AB", color=1))
+    time.sleep(1)
     q.put(dict(slot=15, msg="0123", color=2))
-    time.sleep(5)
+    time.sleep(1)
 
     subproc.kill()
     server.kill()
+    # subproc.join()
+    # server.join()
     pass
 
 if __name__ == "__main__":

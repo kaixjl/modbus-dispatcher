@@ -15,7 +15,7 @@ class ModbusProxier:
             with open(config, "r") as f:
                 config = yaml.safe_load(f)
         self.config = config
-        self.tailing_byte = self.config["tailing_byte"] # type: int
+        self.tailing_byte = self.config["tailing_byte"].to_bytes(1, "big") # type: bytes
 
         self.clients = { it["name"]: ModbusTcpClient(it["host"],
                                                      port=it.get("port", 502),
@@ -41,13 +41,12 @@ class ModbusProxier:
             print(f"Slot {slot} not found.", file=sys.stderr)
             return False
         s = self.slots[slot]
-        v = self.registers_from_str(msg, encoding)
+        v = self.registers_from_str(msg, encoding, tailling=self.tailing_byte)
         if len(v) > s.length - 1:
             v = v[:s.length - 1]
         elif len(v) < s.length - 1:
-            v.extend([int.from_bytes(bytes([self.tailing_byte] * 2), byteorder="big")] * (s.length - 1 - len(v)))
+            v.extend([int.from_bytes(self.tailing_byte * 2, byteorder="big")] * (s.length - 1 - len(v)))
         v.append(color)
-        print(v)
         return self.write_registers(slot, v)
 
     def write_str_without_color(self, slot, msg, encoding="utf-8"):
@@ -56,11 +55,11 @@ class ModbusProxier:
             print(f"Slot {slot} not found.", file=sys.stderr)
             return False
         s = self.slots[slot]
-        v = self.registers_from_str(msg, encoding)
+        v = self.registers_from_str(msg, encoding, tailling=self.tailing_byte)
         if len(v) > s.length - 1:
             v = v[:s.length - 1]
         elif len(v) < s.length - 1:
-            v.extend([self.tailing_byte] * 2 * (s.length - 1 - len(v)))
+            v.extend([int.from_bytes(self.tailing_byte * 2, byteorder="big")] * (s.length - 1 - len(v)))
         return self.write_registers(slot, v)
 
     def write_color(self, slot, color):
@@ -72,7 +71,7 @@ class ModbusProxier:
         """
         - offset: in WORD
         """
-        return self.write_registers(slot, self.registers_from_bytes(msg), offset)
+        return self.write_registers(slot, self.registers_from_bytes(msg, tailling=self.tailing_byte), offset)
 
     def write_registers(self, slot, values, offset=0):
         # type: (str, list[int] | int, int) -> bool
@@ -155,10 +154,12 @@ class ModbusProxier:
         return ret
     
     @classmethod
-    def registers_from_bytes(cls, msg):
-        # type: (bytes) -> list[int]
+    def registers_from_bytes(cls, msg, tailling=b'\x00'):
+        # type: (bytes, bytes) -> list[int]
         payload = []
         payload_bin = msg
+        if (len(payload_bin) % 2 == 1):
+            payload_bin = payload_bin + tailling[:1]
         for i in range(len(payload_bin)//2):
             payload.append(int.from_bytes(bytes(payload_bin[i*2:i*2+2]), byteorder="big"))
         return payload
@@ -172,9 +173,9 @@ class ModbusProxier:
         return bytes(payload)
     
     @classmethod
-    def registers_from_str(cls, msg, encoding="utf-8"):
-        # type: (str, str) -> list[int]
-        return cls.registers_from_bytes(msg.encode(encoding=encoding))
+    def registers_from_str(cls, msg, encoding="utf-8", tailling=b'\x00'):
+        # type: (str, str, bytes) -> list[int]
+        return cls.registers_from_bytes(msg.encode(encoding=encoding), tailling=tailling)
     
     @classmethod
     def registers_to_str(cls, regs, encoding="utf-8"):
@@ -245,15 +246,101 @@ def dispatch_modbus(q):
 
 # === For test ===
 
+def assert_data(data, i):
+    datas = [
+        bytes.fromhex("""
+                    31 35 20 20 20 20 00 02
+                    D5 FD D4 DA BC EC B3 B5 00 02
+                    c7 eb b0 b4 cc e1 ca be b2 d9 d7 f7 20 20 20 20
+                    20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
+                    20 20 20 20 20 20 20 20 00 01
+                    D3 D0 00 02 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02
+                    D7 F3 C1 C1 20 20 00 02 D3 D2 C1 C1 20 20 00 02
+                    32 30 20 20 20 20 00 02 D7 F3 B2 BB C1 C1 00 01
+                    D3 D2 B2 BB C1 C1 00 01 B2 BB C9 C1 CB B8 00 01
+                    D7 F3 C1 C1 20 20 00 02 D3 D2 B2 BB C1 C1 00 01
+                    C1 C1 C6 F0 20 20 00 02
+                    """),
+        bytes.fromhex("""
+                    36 32 35 20 20 20 00 01
+                    D5 FD D4 DA BC EC B3 B5 00 02
+                    c7 eb b0 b4 cc e1 ca be b2 d9 d7 f7 20 20 20 20
+                    20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
+                    20 20 20 20 20 20 20 20 00 01
+                    D3 D0 00 02 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02
+                    D7 F3 C1 C1 20 20 00 02 D3 D2 C1 C1 20 20 00 02
+                    32 30 20 20 20 20 00 02 D7 F3 B2 BB C1 C1 00 01
+                    D3 D2 B2 BB C1 C1 00 01 B2 BB C9 C1 CB B8 00 01
+                    D7 F3 C1 C1 20 20 00 02 D3 D2 B2 BB C1 C1 00 01
+                    C1 C1 C6 F0 20 20 00 02
+                    """),
+        bytes.fromhex("""
+                    36 32 35 20 20 20 00 01
+                    bc ec b3 b5 d6 d0 20 20 00 01
+                    c7 eb b0 b4 cc e1 ca be b2 d9 d7 f7 20 20 20 20
+                    20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
+                    20 20 20 20 20 20 20 20 00 01
+                    D3 D0 00 02 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02
+                    D7 F3 C1 C1 20 20 00 02 D3 D2 C1 C1 20 20 00 02
+                    32 30 20 20 20 20 00 02 D7 F3 B2 BB C1 C1 00 01
+                    D3 D2 B2 BB C1 C1 00 01 B2 BB C9 C1 CB B8 00 01
+                    D7 F3 C1 C1 20 20 00 02 D3 D2 B2 BB C1 C1 00 01
+                    C1 C1 C6 F0 20 20 00 02
+                    """),
+        bytes.fromhex("""
+                    36 32 35 20 20 20 00 01
+                    bc ec b3 b5 d6 d0 20 20 00 01
+                    c7 eb b0 b4 cc e1 ca be b2 d9 d7 f7 20 20 20 20
+                    20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
+                    20 20 20 20 20 20 20 20 00 01
+                    41 42 00 01 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02
+                    D7 F3 C1 C1 20 20 00 02 D3 D2 C1 C1 20 20 00 02
+                    32 30 20 20 20 20 00 02 D7 F3 B2 BB C1 C1 00 01
+                    D3 D2 B2 BB C1 C1 00 01 B2 BB C9 C1 CB B8 00 01
+                    D7 F3 C1 C1 20 20 00 02 D3 D2 B2 BB C1 C1 00 01
+                    C1 C1 C6 F0 20 20 00 02
+                    """),
+        bytes.fromhex("""
+                    36 32 35 20 20 20 00 01
+                    bc ec b3 b5 d6 d0 20 20 00 01
+                    c7 eb b0 b4 cc e1 ca be b2 d9 d7 f7 20 20 20 20
+                    20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
+                    20 20 20 20 20 20 20 20 00 01
+                    41 42 00 01 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02
+                    D7 F3 C1 C1 20 20 00 02 D3 D2 C1 C1 20 20 00 02
+                    32 30 20 20 20 20 00 02 D7 F3 B2 BB C1 C1 00 01
+                    D3 D2 B2 BB C1 C1 00 01 B2 BB C9 C1 CB B8 00 01
+                    D7 F3 C1 C1 20 20 00 02 30 31 32 33 20 20 00 02
+                    C1 C1 C6 F0 20 20 00 02
+                    """),
+    ]
+    assert bytes(data) == datas[i]
+
 def main():
     q = mp.Queue(50)
     subproc = mp.Process(target=dispatch_modbus, args=(q,))
     subproc.start()
-
-    q.put(dict(slot=3, msg="苹果派", color=1))
-
-    time.sleep(1)
     proxier = ModbusProxier("modbus-dispatcher.yaml")
+    init_data = proxier.registers_from_bytes(bytes.fromhex("31 35 20 20 20 20 00 02 D5 FD D4 DA BC EC B3 B5 00 02 20 20 20 20 B3 B5 C1 BE D5 FD D4 DA BC EC B2 E2 A3 AC C7 EB D2 C0 B4 CE B4 F2 BF AA B3 B5 B5 C6 20 20 20 20 20 20 20 20 00 02 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02 D7 F3 C1 C1 20 20 00 02 D3 D2 C1 C1 20 20 00 02 32 30 20 20 20 20 00 02 D7 F3 B2 BB C1 C1 00 01 D3 D2 B2 BB C1 C1 00 01 B2 BB C9 C1 CB B8 00 01 D7 F3 C1 C1 20 20 00 02 D3 D2 B2 BB C1 C1 00 01 C1 C1 C6 F0 20 20 00 02"), tailling=b'\x20')
+    proxier.write_registers_raw(proxier.clients[proxier.slots[3].server], 0, init_data,1)
+    
+    q.put(dict(slot=3, msg="请按提示操作", color=1))
+    time.sleep(1)
+    assert_data(proxier.registers_to_bytes(proxier.read_holding_registers_raw(proxier.clients[proxier.slots[3].server], 0, 74, 1)), 0)
+    q.put(dict(slot=1, msg="625", color=1))
+    time.sleep(1)
+    assert_data(proxier.registers_to_bytes(proxier.read_holding_registers_raw(proxier.clients[proxier.slots[1].server], 0, 74, 1)), 1)
+    q.put(dict(slot=2, msg="检车中", color=1))
+    time.sleep(1)
+    assert_data(proxier.registers_to_bytes(proxier.read_holding_registers_raw(proxier.clients[proxier.slots[2].server], 0, 74, 1)), 2)
+    q.put(dict(slot=4, msg="AB", color=1))
+    time.sleep(1)
+    assert_data(proxier.registers_to_bytes(proxier.read_holding_registers_raw(proxier.clients[proxier.slots[4].server], 0, 74, 1)), 3)
+    q.put(dict(slot=15, msg="0123", color=2))
+    time.sleep(1)
+    assert_data(proxier.registers_to_bytes(proxier.read_holding_registers_raw(proxier.clients[proxier.slots[15].server], 0, 74, 1)), 4)
+
+
     print(proxier.read_holding_registers(3))
     print(proxier.read_str(3, encoding="gb2312"))
     print(proxier.read_color(3))
