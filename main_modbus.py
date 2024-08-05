@@ -251,7 +251,7 @@ def assert_data(data, i):
         bytes.fromhex("""
                     31 35 20 20 20 20 00 02
                     D5 FD D4 DA BC EC B3 B5 00 02
-                    c7 eb b0 b4 cc e1 ca be b2 d9 d7 f7 20 20 20 20
+                    c3 bb d3 d0 bc ec b3 b5 cf ee c4 bf 20 20 20 20
                     20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
                     20 20 20 20 20 20 20 20 00 01
                     D3 D0 00 02 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02
@@ -264,7 +264,7 @@ def assert_data(data, i):
         bytes.fromhex("""
                     36 32 35 20 20 20 00 01
                     D5 FD D4 DA BC EC B3 B5 00 02
-                    c7 eb b0 b4 cc e1 ca be b2 d9 d7 f7 20 20 20 20
+                    c3 bb d3 d0 bc ec b3 b5 cf ee c4 bf 20 20 20 20
                     20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
                     20 20 20 20 20 20 20 20 00 01
                     D3 D0 00 02 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02
@@ -276,8 +276,8 @@ def assert_data(data, i):
                     """),
         bytes.fromhex("""
                     36 32 35 20 20 20 00 01
-                    bc ec b3 b5 d6 d0 20 20 00 01
-                    c7 eb b0 b4 cc e1 ca be b2 d9 d7 f7 20 20 20 20
+                    ce de cf ee c4 bf 20 20 00 01
+                    c3 bb d3 d0 bc ec b3 b5 cf ee c4 bf 20 20 20 20
                     20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
                     20 20 20 20 20 20 20 20 00 01
                     D3 D0 00 02 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02
@@ -289,8 +289,8 @@ def assert_data(data, i):
                     """),
         bytes.fromhex("""
                     36 32 35 20 20 20 00 01
-                    bc ec b3 b5 d6 d0 20 20 00 01
-                    c7 eb b0 b4 cc e1 ca be b2 d9 d7 f7 20 20 20 20
+                    ce de cf ee c4 bf 20 20 00 01
+                    c3 bb d3 d0 bc ec b3 b5 cf ee c4 bf 20 20 20 20
                     20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
                     20 20 20 20 20 20 20 20 00 01
                     41 42 00 01 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02
@@ -302,8 +302,8 @@ def assert_data(data, i):
                     """),
         bytes.fromhex("""
                     36 32 35 20 20 20 00 01
-                    bc ec b3 b5 d6 d0 20 20 00 01
-                    c7 eb b0 b4 cc e1 ca be b2 d9 d7 f7 20 20 20 20
+                    ce de cf ee c4 bf 20 20 00 01
+                    c3 bb d3 d0 bc ec b3 b5 cf ee c4 bf 20 20 20 20
                     20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
                     20 20 20 20 20 20 20 20 00 01
                     41 42 00 01 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02
@@ -324,13 +324,13 @@ def main():
     init_data = proxier.registers_from_bytes(bytes.fromhex("31 35 20 20 20 20 00 02 D5 FD D4 DA BC EC B3 B5 00 02 20 20 20 20 B3 B5 C1 BE D5 FD D4 DA BC EC B2 E2 A3 AC C7 EB D2 C0 B4 CE B4 F2 BF AA B3 B5 B5 C6 20 20 20 20 20 20 20 20 00 02 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02 D7 F3 C1 C1 20 20 00 02 D3 D2 C1 C1 20 20 00 02 32 30 20 20 20 20 00 02 D7 F3 B2 BB C1 C1 00 01 D3 D2 B2 BB C1 C1 00 01 B2 BB C9 C1 CB B8 00 01 D7 F3 C1 C1 20 20 00 02 D3 D2 B2 BB C1 C1 00 01 C1 C1 C6 F0 20 20 00 02"), tailling=b'\x20')
     proxier.write_registers_raw(proxier.clients[proxier.slots[3].server], 0, init_data,1)
     
-    q.put(dict(slot=3, msg="请按提示操作", color=1))
+    q.put(dict(slot=3, msg="没有检车项目", color=1))
     time.sleep(1)
     assert_data(proxier.registers_to_bytes(proxier.read_holding_registers_raw(proxier.clients[proxier.slots[3].server], 0, 74, 1)), 0)
     q.put(dict(slot=1, msg="625", color=1))
     time.sleep(1)
     assert_data(proxier.registers_to_bytes(proxier.read_holding_registers_raw(proxier.clients[proxier.slots[1].server], 0, 74, 1)), 1)
-    q.put(dict(slot=2, msg="检车中", color=1))
+    q.put(dict(slot=2, msg="无项目", color=1))
     time.sleep(1)
     assert_data(proxier.registers_to_bytes(proxier.read_holding_registers_raw(proxier.clients[proxier.slots[2].server], 0, 74, 1)), 2)
     q.put(dict(slot=4, msg="AB", color=1))
@@ -342,8 +342,10 @@ def main():
 
 
     print(proxier.read_holding_registers(3))
-    print(proxier.read_str(3, encoding="gb2312"))
-    print(proxier.read_color(3))
+    assert proxier.read_str(3, encoding="gb2312").strip() == "没有检车项目"
+    assert proxier.read_color(3)==1
+
+    print("All test passed.")
 
     subproc.kill()
     pass

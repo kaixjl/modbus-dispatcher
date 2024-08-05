@@ -207,7 +207,7 @@ def assert_data(data, i):
                     01 10 00 00 00 4A 94
                     31 35 20 20 20 20 00 02
                     D5 FD D4 DA BC EC B3 B5 00 02
-                    c7 eb b0 b4 cc e1 ca be b2 d9 d7 f7 20 20 20 20
+                    c3 bb d3 d0 bc ec b3 b5 cf ee c4 bf 20 20 20 20
                     20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
                     20 20 20 20 20 20 20 20 00 01
                     D3 D0 00 02 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02
@@ -222,7 +222,7 @@ def assert_data(data, i):
                     01 10 00 00 00 4A 94
                     36 32 35 20 20 20 00 01
                     D5 FD D4 DA BC EC B3 B5 00 02
-                    c7 eb b0 b4 cc e1 ca be b2 d9 d7 f7 20 20 20 20
+                    c3 bb d3 d0 bc ec b3 b5 cf ee c4 bf 20 20 20 20
                     20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
                     20 20 20 20 20 20 20 20 00 01
                     D3 D0 00 02 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02
@@ -236,8 +236,8 @@ def assert_data(data, i):
                     00 01 00 00 00 9B
                     01 10 00 00 00 4A 94
                     36 32 35 20 20 20 00 01
-                    bc ec b3 b5 d6 d0 20 20 00 01
-                    c7 eb b0 b4 cc e1 ca be b2 d9 d7 f7 20 20 20 20
+                    ce de cf ee c4 bf 20 20 00 01
+                    c3 bb d3 d0 bc ec b3 b5 cf ee c4 bf 20 20 20 20
                     20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
                     20 20 20 20 20 20 20 20 00 01
                     D3 D0 00 02 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02
@@ -251,8 +251,8 @@ def assert_data(data, i):
                     00 01 00 00 00 9B
                     01 10 00 00 00 4A 94
                     36 32 35 20 20 20 00 01
-                    bc ec b3 b5 d6 d0 20 20 00 01
-                    c7 eb b0 b4 cc e1 ca be b2 d9 d7 f7 20 20 20 20
+                    ce de cf ee c4 bf 20 20 00 01
+                    c3 bb d3 d0 bc ec b3 b5 cf ee c4 bf 20 20 20 20
                     20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
                     20 20 20 20 20 20 20 20 00 01
                     41 42 00 01 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02
@@ -266,8 +266,8 @@ def assert_data(data, i):
                     00 01 00 00 00 9B
                     01 10 00 00 00 4A 94
                     36 32 35 20 20 20 00 01
-                    bc ec b3 b5 d6 d0 20 20 00 01
-                    c7 eb b0 b4 cc e1 ca be b2 d9 d7 f7 20 20 20 20
+                    ce de cf ee c4 bf 20 20 00 01
+                    c3 bb d3 d0 bc ec b3 b5 cf ee c4 bf 20 20 20 20
                     20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
                     20 20 20 20 20 20 20 20 00 01
                     41 42 00 01 D3 D0 00 02 D3 D0 00 02 D3 D0 00 02
@@ -279,6 +279,7 @@ def assert_data(data, i):
                     """),
     ]
     assert bytes(data) == datas[i]
+    print(f"Test {i} passed.")
 
 def test_server_handler(s, a, i):
     # type: (socket.socket, socket._RetAddress, int) -> None
@@ -316,11 +317,11 @@ def main():
     subproc = mp.Process(target=dispatch_modbus, args=(q,))
     subproc.start()
 
-    q.put(dict(slot=3, msg="请按提示操作", color=1))
+    q.put(dict(slot=3, msg="没有检车项目", color=1))
     time.sleep(1)
     q.put(dict(slot=1, msg="625", color=1))
     time.sleep(1)
-    q.put(dict(slot=2, msg="检车中", color=1))
+    q.put(dict(slot=2, msg="无项目", color=1))
     time.sleep(1)
     q.put(dict(slot=4, msg="AB", color=1))
     time.sleep(1)
@@ -331,6 +332,7 @@ def main():
     server.kill()
     # subproc.join()
     # server.join()
+
     pass
 
 if __name__ == "__main__":
